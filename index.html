@@ -253,6 +253,9 @@ body{background:var(--bg);color:var(--txt);font-family:'Crimson Text',Georgia,se
 /* ── DICE OVERLAYS ── */
 #dice-normal{display:none;position:fixed;inset:0;z-index:250;align-items:center;justify-content:center;background:rgba(7,4,15,.86);backdrop-filter:blur(5px)}
 #dice-sanctuary{display:none;position:fixed;inset:0;z-index:250;align-items:center;justify-content:center;background:rgba(22,4,4,.92);backdrop-filter:blur(7px)}
+#dice-destino{display:none;position:fixed;inset:0;z-index:260;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 30%,rgba(20,10,50,.98) 0%,rgba(4,2,12,.97) 70%);backdrop-filter:blur(10px)}
+@keyframes destino-pulse{0%,100%{box-shadow:0 0 40px rgba(212,168,67,.15),0 0 80px rgba(136,120,232,.08)}50%{box-shadow:0 0 80px rgba(212,168,67,.35),0 0 140px rgba(136,120,232,.2)}}
+@keyframes destino-crown{0%{transform:scale(1) translateY(0)}50%{transform:scale(1.18) translateY(-5px)}100%{transform:scale(1) translateY(0)}}
 
 /* ── MODAL ── */
 #modal{display:none;position:fixed;inset:0;background:rgba(5,3,14,.88);z-index:100;justify-content:center;align-items:center}
@@ -443,16 +446,16 @@ body{background:var(--bg);color:var(--txt);font-family:'Crimson Text',Georgia,se
 
     <div class="inst-section">
       <div class="inst-sec-title">¿De qué trata?</div>
-      <div class="inst-tip"><span>✦</span>Eres un Arcano — un mago que canaliza el cosmos para lanzar hechizos. Cada turno, el universo revela su energía y tú decides cómo usarla: <strong>atacar</strong> a tu rival o <strong>acumular poder</strong> para convertirte en Rey Mago.</div>
+      <div class="inst-tip"><span>✦</span>Eres un Arcano — un mago que canaliza el cosmos para lanzar hechizos. Cada turno el universo revela su energía y tú decides: <strong>atacar</strong> a tu rival o <strong>acumular poder</strong> para disputar la corona en el Santuario del Destino. Dos rutas de victoria, una sola decisión por turno.</div>
     </div>
 
     <div class="inst-section">
       <div class="inst-sec-title">Componentes</div>
       <div class="inst-cards-row">
-        <div class="inst-card"><div class="inst-card-icon">🃏</div><div class="inst-card-title">Mazo de hechizos</div><div class="inst-card-desc">42 cartas — ataques, escudos, encantamientos y maldiciones. Cada una tiene un elemento.</div></div>
-        <div class="inst-card"><div class="inst-card-icon">🌌</div><div class="inst-card-title">Mazo del cosmos</div><div class="inst-card-desc">32 cartas — revelan la energía del universo cada turno. Definen qué hechizos se activan.</div></div>
-        <div class="inst-card"><div class="inst-card-icon">✦</div><div class="inst-card-title">Fichas de cosmos</div><div class="inst-card-desc">Tu poder acumulado. Llegar a 30 fichas te corona Rey Mago y ganas la partida.</div></div>
-        <div class="inst-card"><div class="inst-card-icon">🎲</div><div class="inst-card-title">Dado</div><div class="inst-card-desc">Resuelve los bloqueos cuando una carta de escudo no está perfectamente alineada.</div></div>
+        <div class="inst-card"><div class="inst-card-icon">🃏</div><div class="inst-card-title">Mazo de hechizos</div><div class="inst-card-desc">42 cartas — ataques, escudos, encantamientos y maldiciones. Cada una pertenece a un elemento.</div></div>
+        <div class="inst-card"><div class="inst-card-icon">🌌</div><div class="inst-card-title">Mazo del cosmos</div><div class="inst-card-desc">32 cartas — revelan la energía del universo cada turno y determinan qué hechizos se activan.</div></div>
+        <div class="inst-card"><div class="inst-card-icon">✦</div><div class="inst-card-title">Fichas de cosmos</div><div class="inst-card-desc">Tu poder acumulado. Al llegar a 30 se activa el Santuario del Destino — un duelo final que decide la corona.</div></div>
+        <div class="inst-card"><div class="inst-card-icon">🎲</div><div class="inst-card-title">Dado</div><div class="inst-card-desc">Resuelve escudos no alineados, el Santuario del Caos y la tirada del Santuario del Destino.</div></div>
       </div>
     </div>
 
@@ -461,10 +464,10 @@ body{background:var(--bg);color:var(--txt);font-family:'Crimson Text',Georgia,se
       <div class="inst-steps">
         <div class="inst-step"><div class="inst-step-num">1</div><div class="inst-step-body"><div class="inst-step-title">Alineación</div><div class="inst-step-desc">Elige 3 cartas de tu mano y colócalas boca arriba. El cosmos coloca 3 cartas boca abajo frente a ellas.</div></div></div>
         <div class="inst-step"><div class="inst-step-num">2</div><div class="inst-step-body"><div class="inst-step-title">Revelación</div><div class="inst-step-desc">Se voltea el cosmos. Si alguna carta del cosmos coincide en <strong>elemento</strong> con tu hechizo — directamente o en diagonal adyacente — ¡tienes una alineación!</div></div></div>
-        <div class="inst-step"><div class="inst-step-num">3</div><div class="inst-step-body"><div class="inst-step-title">Decisión</div><div class="inst-step-desc">Con alineación puedes hacer <strong>una</strong> cosa: atacar a tu rival (lanzas un hechizo) o acumular cosmos (ganas fichas ✦). No puedes hacer ambas.</div></div></div>
-        <div class="inst-step"><div class="inst-step-num">4</div><div class="inst-step-body"><div class="inst-step-title">Defensa</div><div class="inst-step-desc">Si te atacan, puedes defenderte con un escudo. <strong>Escudo alineado</strong> = bloqueo automático. <strong>Escudo sin alinear</strong> = tiras el dado (par bloquea, non recibe daño).</div></div></div>
+        <div class="inst-step"><div class="inst-step-num">3</div><div class="inst-step-body"><div class="inst-step-title">Decisión</div><div class="inst-step-desc">Con alineación puedes hacer <strong>una</strong> cosa: <strong>atacar</strong> a tu rival o <strong>acumular</strong> fichas de cosmos. Nunca las dos. Si tienes 3/3 alineadas, recibes +5 fichas de bonus <em>siempre</em>, aunque ataques.</div></div></div>
+        <div class="inst-step"><div class="inst-step-num">4</div><div class="inst-step-body"><div class="inst-step-title">Defensa</div><div class="inst-step-desc">Si te atacan, el cosmos decidió tu guardia desde la Revelación. <strong>Escudo alineado</strong> = bloqueo automático (y contraataque si eres Abjurador). <strong>Escudo sin alinear</strong> = tiras el dado. <strong>Sin escudo ni alineaciones</strong> = Santuario del Caos (cuesta 2 fichas).</div></div></div>
       </div>
-      <div class="inst-tip"><span>⭐ BONUS</span>Si tus 3 cartas coinciden con las 3 del cosmos — <strong>alineación perfecta</strong> — recibes +5 fichas extra, incluso si atacas ese turno.</div>
+      <div class="inst-tip"><span>⚠</span>Solo se aplica el Protocolo de Defensa completo la <strong>primera vez</strong> que te atacan en un turno. Un segundo ataque ese mismo turno es daño directo — sin dado, sin Santuario.</div>
     </div>
 
     <div class="inst-section">
@@ -480,10 +483,20 @@ body{background:var(--bg);color:var(--txt);font-family:'Crimson Text',Georgia,se
     </div>
 
     <div class="inst-section">
+      <div class="inst-sec-title">♛ Santuario del Destino</div>
+      <div class="inst-tip" style="margin-bottom:10px"><span>♛</span>Al llegar a <strong>30 fichas</strong> no ganas de inmediato — entras al Santuario del Destino al inicio de tu siguiente turno. El cosmos decide si mereces la corona.</div>
+      <div class="inst-steps">
+        <div class="inst-step"><div class="inst-step-num" style="color:var(--gold)">1</div><div class="inst-step-body"><div class="inst-step-title">La Tirada del Destino</div><div class="inst-step-desc">Tiras el dado. <strong>PAR</strong>: lanzas un ataque final al rival — él puede defenderse con escudo. Si el ataque no es bloqueado, queda a 0 PV y pierdes la partida. <strong>NON</strong>: el cosmos rechaza la corona y pierdes 10 fichas. La batalla continúa.</div></div></div>
+        <div class="inst-step"><div class="inst-step-num" style="color:var(--gold)">2</div><div class="inst-step-body"><div class="inst-step-title">El ciclo se repite</div><div class="inst-step-desc">Si el ataque fue bloqueado o sacaste NON, conservas tus fichas y sigues jugando con normalidad. Cada vez que vuelvas a acumular 30 fichas, el Santuario se activa de nuevo. No hay límite de intentos.</div></div></div>
+      </div>
+      <div class="inst-tip"><span>🛡</span><strong>Protección del Contador:</strong> si tienes 20 o más fichas y un escudo alineado ese turno, los robos de fichas enemigos quedan bloqueados automáticamente. Protege tu tesoro cuando más lo necesitas.</div>
+    </div>
+
+    <div class="inst-section">
       <div class="inst-sec-title">Cómo ganar</div>
       <div class="inst-win-row">
-        <div class="inst-win"><div class="inst-win-icon">🗡️</div><div class="inst-win-title">Eliminación</div><div class="inst-win-desc">Reduce los 10 Puntos de Vida del rival a 0. Cada ataque resta 1 o 2 PV.</div></div>
-        <div class="inst-win"><div class="inst-win-icon">👑</div><div class="inst-win-title">Rey Mago</div><div class="inst-win-desc">Acumula 30 fichas de cosmos en tu zona de poder. La corona es tuya.</div></div>
+        <div class="inst-win"><div class="inst-win-icon">🗡️</div><div class="inst-win-title">Eliminación</div><div class="inst-win-desc">Reduce los 10 Puntos de Vida del rival a 0. Cada ataque resta 1 o 2 PV según la carta.</div></div>
+        <div class="inst-win"><div class="inst-win-icon">♛</div><div class="inst-win-title">Santuario del Destino</div><div class="inst-win-desc">Llega a 30 fichas y supera la Tirada del Destino: dado PAR + el rival no bloquea tu ataque final. La corona es tuya.</div></div>
       </div>
     </div>
 
@@ -638,6 +651,19 @@ body{background:var(--bg);color:var(--txt);font-family:'Crimson Text',Georgia,se
     <div id="ds-result" style="font-family:'Cinzel',serif;font-size:19px;font-weight:700;letter-spacing:3px;padding:9px 22px;border-radius:8px;display:inline-block;margin-bottom:9px"></div>
     <div id="ds-consequence" style="font-size:11.5px;font-family:'Cinzel',serif;letter-spacing:1px;padding:5px 14px;border-radius:6px;margin-top:3px"></div>
     <button id="ds-continue" style="margin-top:16px;font-family:'Cinzel',serif;font-size:10.5px;letter-spacing:2px;padding:8px 24px;border-radius:7px;border:1px solid rgba(232,83,78,.3);background:rgba(232,83,78,.05);color:#e05050;cursor:pointer">Continuar ›</button>
+  </div>
+</div>
+
+<!-- SANTUARIO DEL DESTINO OVERLAY -->
+<div id="dice-destino">
+  <div id="dd-box" style="background:linear-gradient(145deg,#0e0820,#06030f);border:1px solid rgba(212,168,67,.4);border-radius:18px;padding:30px 38px 26px;text-align:center;min-width:300px;max-width:360px;animation:destino-pulse 2.4s ease-in-out infinite">
+    <div id="dd-crown" style="font-size:42px;margin-bottom:6px;animation:destino-crown 2s ease-in-out infinite">♛</div>
+    <div style="font-family:'Cinzel',serif;font-size:11px;letter-spacing:4px;color:var(--gold);margin-bottom:4px">SANTUARIO DEL DESTINO</div>
+    <div id="dd-subtitle" style="font-size:11px;color:var(--muted);font-family:'Crimson Text',serif;font-style:italic;margin-bottom:18px">El cosmos decide si mereces la corona...</div>
+    <div id="dd-face" style="font-size:68px;line-height:1;margin-bottom:14px;filter:drop-shadow(0 0 14px rgba(212,168,67,.5))">⚀</div>
+    <div id="dd-result" style="font-family:'Cinzel',serif;font-size:18px;font-weight:700;letter-spacing:3px;padding:9px 22px;border-radius:8px;display:inline-block;margin-bottom:9px"></div>
+    <div id="dd-consequence" style="font-size:11px;font-family:'Cinzel',serif;letter-spacing:1px;padding:6px 16px;border-radius:6px;margin-top:4px;line-height:1.6"></div>
+    <button id="dd-continue" style="margin-top:18px;font-family:'Cinzel',serif;font-size:10.5px;letter-spacing:2px;padding:9px 26px;border-radius:8px;border:1px solid rgba(212,168,67,.4);background:rgba(212,168,67,.07);color:var(--gold);cursor:pointer">Continuar ›</button>
   </div>
 </div>
 
@@ -1030,8 +1056,8 @@ function startGame(){
   G={
     mode:gameMode,spells:sp.slice(10),cosmos:shuf(cs),turn:1,phase:'alignment',gameOver:false,WIN,
     logs:['✦ La partida comienza.'],cosmosRevealed:false,pendingDef:null,localViewFor:'pl',
-    pl:{hp:MHP,tokens:0,hand:sp.slice(0,5),alignZone:[null,null,null],cosmosZone:[null,null,null],alignments:null,selIdx:[],atkRec:0,diceInv:false,arch:_j1arch||selArch||ARCHETYPES[0],archEl:_j1el||selEl,charges:(_j1arch||selArch||ARCHETYPES[0]).charges,oracleIdx:null,name:p1name},
-    ai:{hp:MHP,tokens:0,hand:sp.slice(5,10),alignZone:[null,null,null],cosmosZone:[null,null,null],alignments:null,atkRec:0,arch:p2arch,archEl:p2el,charges:p2arch.charges,oracleIdx:null,selIdx:[],name:p2name},
+    pl:{hp:MHP,tokens:0,hand:sp.slice(0,5),alignZone:[null,null,null],cosmosZone:[null,null,null],alignments:null,selIdx:[],atkRec:0,diceInv:false,sanctDestPending:false,arch:_j1arch||selArch||ARCHETYPES[0],archEl:_j1el||selEl,charges:(_j1arch||selArch||ARCHETYPES[0]).charges,oracleIdx:null,name:p1name},
+    ai:{hp:MHP,tokens:0,hand:sp.slice(5,10),alignZone:[null,null,null],cosmosZone:[null,null,null],alignments:null,atkRec:0,sanctDestPending:false,arch:p2arch,archEl:p2el,charges:p2arch.charges,oracleIdx:null,selIdx:[],name:p2name},
   };
   const plCol=gameMode==='local'?'var(--tierra)':'var(--agua)';
   document.getElementById('pl-aname').textContent=G.pl.name;document.getElementById('pl-aname').style.color=plCol;
@@ -1138,6 +1164,25 @@ function doPhase(ph){
 function startAlignment(){
   G.pl.alignZone=[null,null,null];G.pl.selIdx=[];G.pl.atkRec=0;G.pl.diceInv=false;G.ai.atkRec=0;
   G.cosmosRevealed=false;replenish(G.pl);replenish(G.ai);
+
+  // ── Santuario del Destino: se resuelve al inicio del turno ──
+  if(G.pl.sanctDestPending){
+    render();
+    logM(`♖ ¡Santuario del Destino! ${G.pl.name} arriesga la corona.`);
+    setTimeout(()=>triggerSanctuaryOfDestiny(G.pl,G.ai,'ai-panel',()=>{
+      if(!G.gameOver)doPhase('alignment');
+    }),400);
+    return;
+  }
+  if(G.ai.sanctDestPending){
+    render();
+    logM(`♖ Santuario del Destino: ${G.ai.name} arriesga la corona.`);
+    setTimeout(()=>triggerSanctuaryOfDestiny(G.ai,G.pl,'pl-panel',()=>{
+      if(!G.gameOver)doPhase('alignment');
+    }),400);
+    return;
+  }
+
   logM(`— Turno ${G.turn}: ${G.pl.name} — selecciona 3 cartas.`);
   render();
   const btns=[{label:'Confirmar alineación →',cls:'gold',id:'btn-ok',disabled:true,fn:confirmAlign}];
@@ -1334,6 +1379,11 @@ function elementalistaAttack(){
 }
 function plTheft(boosted){
   const amt=boosted?4:2;if(boosted)G.pl.charges--;
+  // Protección del Contador (cap.11): 20+ fichas + escudo alineado bloquea el robo
+  if(G.ai.tokens>=20){
+    const blocked=G.ai.alignZone.some((c,idx)=>c&&c.type==='shield'&&shieldAl(G.ai.cosmosZone,G.ai.alignZone,idx));
+    if(blocked){logM(`🛡 ${G.ai.name} bloquea el robo — Protección del Contador (20+ fichas + escudo alineado).`);Audio.sfx('swap');blockEffect(document.getElementById('ai-panel'));afterPl();return;}
+  }
   const s=Math.min(amt,G.ai.tokens);G.ai.tokens-=s;G.pl.tokens+=s;
   logM(`✨ ${G.pl.name} roba ${s} fichas. Total: ${G.pl.tokens}`);Audio.sfx('token');
   spawnFloat(`+${s}✦`,'var(--gold)',document.getElementById('pl-panel'));
@@ -1702,7 +1752,9 @@ function aiActs(){
   const isDruida=G.ai.arch.id==='druida';
   const shouldAtk=!isDruida&&(attacks.length||thefts.length)&&(G.pl.hp<=6||Math.random()>.32);
   if(shouldAtk){
-    if(thefts.length&&G.pl.tokens>0&&Math.random()>.45){
+    // IA respeta la Protección del Contador — no intenta robar si está bloqueado
+    const plTheftBlocked=G.pl.tokens>=20&&G.pl.alignZone.some((c,i)=>c&&c.type==='shield'&&shieldAl(G.pl.cosmosZone,G.pl.alignZone,i));
+    if(thefts.length&&G.pl.tokens>0&&!plTheftBlocked&&Math.random()>.45){
       const amt=G.ai.arch.id==='encantador'&&G.ai.charges>0?4:2;if(G.ai.arch.id==='encantador'&&G.ai.charges>0)G.ai.charges--;
       const s=Math.min(amt,G.pl.tokens);G.pl.tokens-=s;G.ai.tokens+=s;
       logM(`${G.ai.name} roba ${s} fichas.`);Audio.sfx('token');updateTok();checkWin();doPhase('cleanup');return;
@@ -1785,6 +1837,12 @@ function p2ElemAttack(){renderActs([]);if(G.ai.charges<=0)return;G.ai.charges--;
   setTimeout(()=>{G.localViewFor='pl';showTurnIndicator(G.pl.name,'¡Defensa!',()=>showDefModalFor(G.pl,'pl-panel','p2'));},400);
 }
 function p2Theft(boosted){renderActs([]);const amt=boosted?4:2;if(boosted)G.ai.charges--;
+  // Protección del Contador (cap.11): 20+ fichas + escudo alineado bloquea el robo
+  if(G.pl.tokens>=20){
+    const blocked=G.pl.alignZone.some((c,idx)=>c&&c.type==='shield'&&shieldAl(G.pl.cosmosZone,G.pl.alignZone,idx));
+    if(blocked){logM(`🛡 ${G.pl.name} bloquea el robo — Protección del Contador (20+ fichas + escudo alineado).`);Audio.sfx('swap');blockEffect(document.getElementById('pl-panel'));
+      if(!G.gameOver){G.localViewFor='pl';showTurnIndicator(G.pl.name,'',()=>doPhase('cleanup'));}return;}
+  }
   const s=Math.min(amt,G.pl.tokens);G.pl.tokens-=s;G.ai.tokens+=s;
   logM(`✨ ${G.ai.name} roba ${s} fichas. Total: ${G.ai.tokens}`);Audio.sfx('token');
   spawnFloat(`+${s}✦`,'var(--gold)',document.getElementById('ai-panel'));
@@ -1819,9 +1877,70 @@ function checkWin(){
   if(G.gameOver)return;
   if(G.ai.hp<=0){G.gameOver=true;Audio.sfx('win');burstParticles(document.getElementById('pl-panel'),['#d4a843','#5ddab8','#f0d080'],30);showModal('✦ Victoria ✦',`${G.pl.name} derrota al ${G.ai.name}. El cosmos es tuyo.`,[{label:'Nueva partida',fn:resetGame}]);return;}
   if(G.pl.hp<=0){G.gameOver=true;Audio.sfx('lose');showModal('✦ Derrota ✦',`${G.ai.name} te ha eliminado. El cosmos permanece velado.`,[{label:'Nueva partida',fn:resetGame}]);return;}
-  if(G.pl.tokens>=G.WIN){G.gameOver=true;Audio.sfx('win');burstParticles(document.getElementById('pl-panel'),['#d4a843','#f0d080','#eter'],35);showModal('✦ Rey Mago ✦',`${G.pl.name} alcanza ${G.WIN} fichas. ¡Coronado Rey Mago!`,[{label:'Nueva partida',fn:resetGame}]);return;}
-  if(G.ai.tokens>=G.WIN){G.gameOver=true;Audio.sfx(G.mode==='local'?'win':'lose');showModal('✦ Rey Mago ✦',`${G.ai.name} acumula ${G.WIN} fichas y es coronado Rey Mago.`,[{label:'Nueva partida',fn:resetGame}]);return;}
+  // Santuario del Destino — llegar al umbral NO es victoria inmediata
+  if(G.pl.tokens>=G.WIN&&!G.pl.sanctDestPending){
+    G.pl.sanctDestPending=true;
+    logM(`♛ ${G.pl.name} alcanza ${G.WIN} fichas — ¡Santuario del Destino al inicio del próximo turno!`);
+    return;
+  }
+  if(G.ai.tokens>=G.WIN&&!G.ai.sanctDestPending){
+    G.ai.sanctDestPending=true;
+    logM(`♛ ${G.ai.name} alcanza ${G.WIN} fichas — Santuario del Destino activado.`);
+    return;
+  }
 }
+
+// ── SANTUARIO DEL DESTINO ───────────────────────────────────────
+let _diceCallback2=null;
+
+function rollDestinoDice(aspirantName,result,callback){
+  const ov=document.getElementById('dice-destino');
+  const face=document.getElementById('dd-face');
+  const res=document.getElementById('dd-result');
+  const cons=document.getElementById('dd-consequence');
+  const btn=document.getElementById('dd-continue');
+  document.getElementById('dd-subtitle').textContent=aspirantName+' tienta al cosmos...';
+  _diceCallback2=callback;
+  ov.style.display='flex';
+  face.style.animation='none';void face.offsetWidth;face.style.animation='dice-roll-sanct .6s ease-out';
+  let f=0;
+  const iv=setInterval(()=>{
+    face.textContent=DICE_FACES[0|Math.random()*6];f++;
+    if(f>14){
+      clearInterval(iv);
+      face.textContent=DICE_FACES[result-1];
+      const par=result%2===0;
+      res.style.cssText='font-family:Cinzel,serif;font-size:19px;font-weight:700;letter-spacing:3px;padding:9px 22px;border-radius:8px;display:inline-block;margin-bottom:9px;'+(par?'color:#d4a843;background:rgba(212,168,67,.1);border:1px solid rgba(212,168,67,.35)':'color:#ff6060;background:rgba(255,80,80,.08);border:1px solid rgba(255,80,80,.28)');
+      res.textContent=result+' — '+(par?'PAR':'NON');
+      cons.style.cssText='font-size:11px;font-family:Cinzel,serif;letter-spacing:1px;padding:6px 16px;border-radius:6px;line-height:1.6;margin-top:4px;'+(par?'color:#d4a843;background:rgba(212,168,67,.07)':'color:#ff6060;background:rgba(255,80,80,.08)');
+      cons.textContent=par?'♛ PAR — Ataque final al rival. ¡Puede defenderse!':'✦ NON — El cosmos rechaza la corona. Pierdes 10 fichas.';
+    }
+  },45);
+  btn.onclick=()=>{ov.style.display='none';if(_diceCallback2){const cb=_diceCallback2;_diceCallback2=null;cb(result,result%2===0);}};
+}
+
+function triggerSanctuaryOfDestiny(aspirant,rival,rivalPanelId,afterFn){
+  aspirant.sanctDestPending=false;
+  const r=1+(0|Math.random()*6);
+  rollDestinoDice(aspirant.name,r,(rv,par)=>{
+    if(par){
+      logM(`♛ Destino: dado ${rv} PAR — ¡${aspirant.name} lanza el ataque final sobre ${rival.name}!`);
+      Audio.sfx('attack');
+      // Ataque que elimina directamente si no es bloqueado (daño = todos sus PV)
+      const fc={type:'attack',sub:'destiny',element:'luz',name:'Ataque del Destino',dmg:rival.hp};
+      atkTarget(rival,rivalPanelId,rival.hp,fc,false,aspirant===G.pl?'pl':'ai');
+    } else {
+      const lost=Math.min(10,aspirant.tokens);
+      aspirant.tokens-=lost;
+      logM(`✦ Destino: dado ${rv} NON — ${aspirant.name} pierde ${lost} fichas. La batalla continúa.`);
+      Audio.sfx('lose');
+      spawnFloat('-10✦','#e05050',document.getElementById(aspirant===G.pl?'pl-panel':'ai-panel'));
+      updateTok();
+      afterFn();
+    }
+  });
+}
+
 
 function resetGame(){
   closeModal();document.getElementById('game').style.display='none';
