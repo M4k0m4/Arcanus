@@ -1285,15 +1285,28 @@ function confirmP2Align(){
 // Swap UI (Alquimista)
 function openSwapUI(){
   if(G.pl.alignZone.filter(Boolean).length===0){logM('Primero coloca cartas en tu alineación.');return;}
-  showModal('⬡ Intercambio Arcano','Elige una posición para reemplazar:',[
-    ...G.pl.alignZone.map((c,i)=>c?{label:`P${i+1}: ${c.name}`,fn:()=>swapAlignPos(i)}:[]).filter(Boolean),
+  if(!G.pl.hand.length){logM('Sin cartas en mano para intercambiar.');return;}
+  // PASO 1: elegir qué posición de alineación reemplazar
+  showModal('⬡ Intercambio Arcano','Paso 1: ¿qué posición quieres reemplazar?',[
+    ...G.pl.alignZone.map((c,i)=>c?{label:`P${i+1}: ${c.name} (${c.element||c.type})`,fn:()=>swapPickCard(i)}:[]).filter(Boolean),
     {label:'Cancelar',fn:closeModal}
   ]);
 }
-function swapAlignPos(pos){
-  closeModal();if(!G.pl.hand.length){logM('Sin cartas en mano para intercambiar.');return;}
-  const oldCard=G.pl.alignZone[pos],newCard=G.pl.hand.shift();
-  G.pl.alignZone[pos]=newCard;if(oldCard)G.pl.hand.push(oldCard);G.pl.charges--;
+function swapPickCard(pos){
+  // PASO 2: elegir qué carta de la mano poner
+  closeModal();
+  showModal('⬡ Intercambio Arcano',`Paso 2: ¿qué carta de tu mano colocas en P${pos+1}?`,[
+    ...G.pl.hand.map((c,i)=>({label:`${c.name} (${c.element||c.type}${c.dmg?' · '+c.dmg+'PV':''})`,fn:()=>swapAlignPos(pos,i)})),
+    {label:'Cancelar',fn:closeModal}
+  ]);
+}
+function swapAlignPos(pos,handIdx){
+  closeModal();
+  const oldCard=G.pl.alignZone[pos];
+  const newCard=G.pl.hand.splice(handIdx,1)[0];
+  G.pl.alignZone[pos]=newCard;
+  if(oldCard)G.pl.hand.push(oldCard);
+  G.pl.charges--;
   logM(`⬡ Intercambiaste P${pos+1}: ${oldCard?.name||'vacío'} → ${newCard.name}`);
   Audio.sfx('swap');renderAlign();renderHand();renderCharges();
 }
@@ -1433,7 +1446,8 @@ function atkTarget(target,panelId,dmg,card,isChain,from){
   // PASO 1: ¿tiene escudo en zona de alineación?
   if(!hasSh){
     // Sin escudo
-    if(target.alignments.count===0){
+    // Null-safe: alignments puede ser null al inicio del turno (Santuario del Destino)
+    if((target.alignments?.count ?? 0)===0){
       // 0 alineaciones → intentar Santuario del Caos
       if(target.tokens>=2){
         // Santuario disponible
@@ -1555,7 +1569,8 @@ function showDefModalFor(target,panelId,from){
 
   // ── PASO 1: ¿tiene escudo? ──────────────────────────────────
   if(!hasSh){
-    if(target.alignments.count===0){
+    // Null-safe: alignments puede ser null al inicio del turno (Santuario del Destino)
+    if((target.alignments?.count ?? 0)===0){
       // 0 alineaciones, 0 escudos → Santuario del Caos o Guardia Vacía
       const sanctAvail=target.tokens>=2;
       if(sanctAvail){
@@ -1585,18 +1600,20 @@ function showDefModalFor(target,panelId,from){
 
   // ── Escudo NO alineado → Guardia Desincronizada ─────────────
   if(isChain){
-    // EXCEPCIÓN cadena: Guardia Desincronizada no tiene efecto
-    btns.push({label:`❌ Cadena: Guardia Desincronizada sin efecto — daño directo`,cls:'red',fn:()=>defendFor(target,panelId,from,'none')});
-    showModal(`⚔ ${card.name} (${dmg}PV)`,'⛓ Cadena: la guardia desincronizada no bloquea.',btns);
+    // Cadena: Guardia Desincronizada sin efecto → solo daño directo
+    btns.push({label:`❌ Cadena ignora escudo no alineado — recibir ${dmg} PV`,cls:'red',fn:()=>defendFor(target,panelId,from,'none')});
+    showModal(`⚔ ${card.name} (${dmg}PV)`,'⛓ Cadena: el escudo no alineado no tiene efecto.',btns);
     return;
   }
+  // Escudo no alineado: el jugador elige entre usar el dado o recibir daño directo
   if(abjHasCharge){
     btns.push({label:`◇ Abjurador — activar escudo (${target.charges} restantes)`,cls:'purple',fn:()=>defendFor(target,panelId,from,'abjurador')});
   } else {
-    btns.push({label:'🎲 Guardia Desincronizada — tirar dado (PAR=bloqueo)',fn:()=>defendFor(target,panelId,from,'unaligned')});
+    btns.push({label:'🎲 Usar escudo — tirar dado (PAR = bloqueo / NON = daño)',fn:()=>defendFor(target,panelId,from,'unaligned')});
   }
-  btns.push({label:`❌ Sin defensa — recibir ${dmg} PV`,cls:'red',fn:()=>defendFor(target,panelId,from,'none')});
-  showModal(`⚔ ${card.name} (${dmg}PV)`,'Paso 2: escudo sin alinear — Guardia Desincronizada.',btns);
+  // Opción de recibir sin usar escudo — permite conservar el escudo para otras mecánicas
+  btns.push({label:`❌ Recibir daño sin escudo — ${dmg} PV`,cls:'red',fn:()=>defendFor(target,panelId,from,'none')});
+  showModal(`⚔ ${card.name} (${dmg}PV)`,'Escudo no alineado: ¿usas el dado o recibes el daño?',btns);
 }
 
 // TAREA 1: defendFor — ejecuta la defensa elegida
@@ -2299,26 +2316,30 @@ document.getElementById('sel-screen').style.display='none';
         </g>
       </g>
 
-      <!-- ══ RAYO L→R (cometa dorado) ══ -->
-      <!-- Orbe L en (73,87), recorre +174px, llega a orbe R (247,87) -->
+      <!-- ══ RAYO L→R (relámpago dorado) — parte desde orbe L (73,87) ══ -->
       <g class="ee-bl" transform="translate(73,87)">
-        <ellipse cx="-6" cy="0" rx="14" ry="5" fill="#d4a843" opacity=".25" filter="url(#eeBlur)"/>
-        <ellipse cx="-10" cy="0" rx="12" ry="3" fill="#d4a843" opacity=".45"/>
-        <ellipse cx="-18" cy="0" rx="6" ry="1.8" fill="#d4a843" opacity=".2"/>
-        <circle cx="0" cy="0" r="5.5" fill="#d4a843"/>
-        <circle cx="0" cy="0" r="3" fill="#fff8c0"/>
-        <circle cx="0" cy="0" r="1.2" fill="white"/>
+        <!-- Halo de lanzamiento -->
+        <circle cx="0" cy="0" r="9" fill="#d4a843" opacity=".18" filter="url(#eeBlur)"/>
+        <!-- Trayectoria del rayo (zigzag, eje +X) — empieza en x=0 y viaja ~170px -->
+        <polyline points="0,0 22,-8 40,5 62,-9 82,4 104,-7 124,6 148,-5 168,2"
+          stroke="#fff8c0" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".95"/>
+        <polyline points="0,0 22,-8 40,5 62,-9 82,4 104,-7 124,6 148,-5 168,2"
+          stroke="#d4a843" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".35" filter="url(#eeBlur)"/>
+        <!-- Núcleo de la punta -->
+        <circle cx="168" cy="2" r="4.5" fill="#d4a843" opacity=".9"/>
+        <circle cx="168" cy="2" r="2.5" fill="#fff8c0" opacity=".95"/>
       </g>
 
-      <!-- ══ RAYO R→L (cometa púrpura) ══ -->
-      <!-- Orbe R en (247,87), recorre -174px, llega a orbe L (73,87) -->
+      <!-- ══ RAYO R→L (relámpago púrpura) — parte desde orbe R (247,87) ══ -->
       <g class="ee-br" transform="translate(247,87)">
-        <ellipse cx="6" cy="0" rx="14" ry="5" fill="#8878e8" opacity=".25" filter="url(#eeBlur)"/>
-        <ellipse cx="10" cy="0" rx="12" ry="3" fill="#8878e8" opacity=".45"/>
-        <ellipse cx="18" cy="0" rx="6" ry="1.8" fill="#8878e8" opacity=".2"/>
-        <circle cx="0" cy="0" r="5.5" fill="#8878e8"/>
-        <circle cx="0" cy="0" r="3" fill="#d0c8f8"/>
-        <circle cx="0" cy="0" r="1.2" fill="white"/>
+        <circle cx="0" cy="0" r="9" fill="#8878e8" opacity=".18" filter="url(#eeBlur)"/>
+        <!-- Zigzag espejado (eje -X) -->
+        <polyline points="0,0 -22,7 -40,-5 -62,8 -82,-4 -104,6 -124,-6 -148,4 -168,-2"
+          stroke="#d0c8f8" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".95"/>
+        <polyline points="0,0 -22,7 -40,-5 -62,8 -82,-4 -104,6 -124,-6 -148,4 -168,-2"
+          stroke="#8878e8" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".35" filter="url(#eeBlur)"/>
+        <circle cx="-168" cy="-2" r="4.5" fill="#8878e8" opacity=".9"/>
+        <circle cx="-168" cy="-2" r="2.5" fill="#d0c8f8" opacity=".95"/>
       </g>
 
       <!-- ══ IMPACTO en orbe R ══ -->
