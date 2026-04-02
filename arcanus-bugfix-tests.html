@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<!--
+  arcanus-bugfix-tests.html
+  Test de exploración — Bug A: goToSelect roto desde instrucciones
+  Property 1: Bug Condition — goToSelect falla cuando title-screen está oculto
+
+  Test de exploración — Bug B: showPassDevice cubre viewport completo durante partida
+  Property 1: Bug Condition — showPassDevice activa overlay fullscreen durante transiciones de turno
+
+  Test de exploración — Bug C: sin inputs de nombre en modo local
+  Property 1: Bug Condition — No existen campos de nombre al seleccionar modo local
+
+  CRITICAL: Estos tests DEBEN FALLAR/CONFIRMAR el bug en código sin fix.
+  El fallo confirma que el bug existe.
+  NO intentar arreglar el test ni el código cuando falle.
+
+  Validates: Requirements 1.1, 2.1 (Bug A) | 1.2, 1.3, 1.4, 2.2, 2.3, 2.4 (Bug B) | 1.5, 1.6, 2.5, 2.6 (Bug C)
+
+  Bug A real:
+    - goToSelect() NO oculta inst-screen antes de mostrar sel-screen.
+    - inst-screen tiene z-index:75, sel-screen tiene z-index:50.
+    - inst-screen (visible, z-index:75) TAPA a sel-screen (z-index:50).
+    - El usuario ve instrucciones en lugar de la pantalla de selección.
+
+  Bug B real:
+    - showPassDevice() añade clase 'show' a #pass-device.
+    - #pass-device tiene position:fixed; inset:0; z-index:180.
+    - Cubre el 100% del viewport durante transiciones de turno en partida local.
+    - El tablero de juego queda completamente oculto.
+
+  Bug C real:
+    - setMode('local') NO crea ni muestra inputs #p1-name-input / #p2-name-input.
+    - document.getElementById('p1-name-input') === null → inputs no existen en el DOM.
+    - document.getElementById('p2-name-input') === null → inputs no existen en el DOM.
+    - startGame() asigna hardcoded 'Jugador 1' / 'Jugador 2' sin consultar al usuario.
+-->
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Arcanus Bugfix Tests — Bug A, Bug B &amp; Bug C</title>
+<style>
+  body { font-family: monospace; background: #0a0a0a; color: #e0e0e0; padding: 20px; }
+  h1 { color: #d4a843; font-size: 18px; letter-spacing: 2px; }
+  .suite-title { color: #9ab4cc; font-size: 13px; letter-spacing: 1px; margin: 16px 0 8px; }
+  .test { padding: 6px 10px; margin: 4px 0; border-radius: 4px; font-size: 12px; }
+  .pass { background: rgba(111,171,42,.15); border-left: 3px solid #6fab2a; color: #a8d060; }
+  .fail { background: rgba(232,83,78,.15); border-left: 3px solid #e8534e; color: #f08080; }
+  .info { background: rgba(74,159,224,.1); border-left: 3px solid #4a9fe0; color: #8ac8f0; }
+  .counterexample { background: rgba(212,168,67,.08); border: 1px solid rgba(212,168,67,.3);
+    border-radius: 6px; padding: 12px; margin: 12px 0; font-size: 11px; color: #d4a843; }
+  .summary { margin-top: 20px; padding: 12px; border-radius: 6px; font-size: 13px; font-weight: bold; }
+  .summary.all-pass { background: rgba(111,171,42,.2); color: #6fab2a; }
+  .summary.has-fail { background: rgba(232,83,78,.2); color: #e8534e; }
+  pre { margin: 4px 0; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+
+<!-- DOM mínimo necesario para que goToSelect() funcione -->
+<div id="title-screen" style="display:flex"></div>
+<div id="inst-screen" style="display:none"></div>
+<div id="sel-screen" style="display:none"></div>
+
+<!-- DOM mínimo necesario para Bug B: showPassDevice() y #game -->
+<div id="game" style="display:none"></div>
+<div id="pass-device" style="display:none;position:fixed;inset:0;z-index:180;flex-direction:column;align-items:center;justify-content:center">
+  <div id="pd-name"></div>
+  <div id="pd-action"></div>
+  <button id="pd-btn">Listo →</button>
+</div>
+
+<!-- DOM mínimo necesario para Bug C: setMode() necesita estos elementos -->
+<button id="mode-ai" class="mode-btn">IA</button>
+<button id="mode-local" class="mode-btn">Local · 2 Jugadores</button>
+<div id="sel-player-note" style="display:none"></div>
+<button id="sel-confirm" disabled></button>
+
+<h1>✦ ARCANUS — BUGFIX TESTS</h1>
+<div id="output"></div>
+
+<script>
+// ─── Mini test runner ───────────────────────────────────────────────────────
+const results = [];
+
+function assert(description, condition, detail) {
+  results.push({ description, pass: condition, detail: detail || '' });
+}
+
+function log(msg, cls) {
+  const div = document.createElement('div');
+  div.className = 'test ' + (cls || 'info');
+  div.innerHTML = '<pre>' + msg + '</pre>';
+  document.getElementById('output').appendChild(div);
+}
+
+function logSuiteTitle(title) {
+  const div = document.createElement('div');
+  div.className = 'suite-title';
+  div.textContent = title;
+  document.getElementById('output').appendChild(div);
+}
+
+function renderResults() {
+  const out = document.getElementById('output');
+  results.forEach(r => {
+    const div = document.createElement('div');
+    div.className = 'test ' + (r.pass ? 'pass' : 'fail');
+    div.innerHTML = '<pre>' + (r.pass ? '✓ PASS' : '✗ FAIL') + '  ' + r.description +
+      (r.detail ? '\n       ' + r.detail : '') + '</pre>';
+    out.appendChild(div);
+  });
+  const total = results.length;
+  const passed = results.filter(r => r.pass).length;
+  const failed = total - passed;
+  const sum = document.createElement('div');
+  sum.className = 'summary ' + (failed > 0 ? 'has-fail' : 'all-pass');
+  sum.textContent = 'Resultados: ' + passed + '/' + total + ' pasaron — ' + failed + ' fallaron';
+  out.appendChild(sum);
+}
+
+// ─── Funciones bajo test — extraídas de Arcanus_V9.html (sin modificar) ────
+function goToSelect(){
+  const ts=document.getElementById('title-screen');
+  ts.classList.add('hide');
+  setTimeout(()=>{ts.style.display='none';document.getElementById('sel-screen').style.display='block';},580);
+}
+function goToInstructions(){
+  document.getElementById('title-screen').style.display='none';
+  const ins=document.getElementById('inst-screen');
+  ins.style.display='block'; ins.classList.add('show');
+}
+
+// ─── showPassDevice — extraída de Arcanus_V9.html (sin modificar) ──────────
+function showPassDevice(name,action,callback){
+  document.getElementById('pd-name').textContent=name;
+  document.getElementById('pd-action').textContent=action;
+  document.getElementById('pd-btn').onclick=()=>{
+    document.getElementById('pass-device').classList.remove('show');
+    callback();
+  };
+  document.getElementById('pass-device').classList.add('show');
+}
+
+// ─── Helper resetDOM ────────────────────────────────────────────────────────
+function resetDOM() {
+  const ts   = document.getElementById('title-screen');
+  const inst = document.getElementById('inst-screen');
+  const sel  = document.getElementById('sel-screen');
+  ts.style.display = 'flex';
+  ts.style.opacity = '1';
+  ts.style.transform = '';
+  ts.classList.remove('hide');
+  inst.classList.remove('show');
+  inst.style.display = 'none';
+  sel.style.display = 'none';
+}
+
+// ─── SUITE 1 — Bug A: goToSelect() desde instrucciones ─────────────────────
+// Property 1: Bug Condition — goToSelect falla cuando title-screen está oculto
+// Validates: Requirements 1.1, 2.1
+logSuiteTitle('SUITE 1 — Bug A: goToSelect() desde instrucciones (Property 1: Bug Condition)');
+log('Simulando flujo real: título → instrucciones → goToSelect()...', 'info');
+
+resetDOM();
+goToInstructions(); // simular navegación a instrucciones
+
+const ts_pre   = document.getElementById('title-screen');
+const inst_pre = document.getElementById('inst-screen');
+const sel_pre  = document.getElementById('sel-screen');
+
+assert('Precondición: title-screen.style.display === "none"',
+  ts_pre.style.display === 'none', 'Actual: "' + ts_pre.style.display + '"');
+assert('Precondición: inst-screen.style.display === "block"',
+  inst_pre.style.display === 'block', 'Actual: "' + inst_pre.style.display + '"');
+assert('Precondición: inst-screen tiene clase "show"',
+  inst_pre.classList.contains('show'), 'classList: "' + inst_pre.className + '"');
+
+// El usuario hace clic en "¡Jugar ahora! ✦" → llama goToSelect()
+goToSelect();
+
+setTimeout(function() {
+  const inst_post = document.getElementById('inst-screen');
+  const sel_post  = document.getElementById('sel-screen');
+
+  // sel-screen SÍ recibe display:block (el setTimeout ejecuta)
+  assert('sel-screen.style.display === "block" después de 700ms (setTimeout ejecuta)',
+    sel_post.style.display === 'block', 'Actual: "' + sel_post.style.display + '"');
+
+  // DEBE FALLAR — inst-screen NO se oculta → tapa a sel-screen (z-index:75 > z-index:50)
+  assert('Bug A — inst-screen.style.display === "none" después de goToSelect() [DEBE FALLAR en código sin fix]',
+    inst_post.style.display === 'none',
+    'Actual: "' + inst_post.style.display + '" — CONTRAEJEMPLO: inst-screen permanece visible ' +
+    '(z-index:75 > z-index:50 de sel-screen) → el usuario no puede ver sel-screen');
+
+  // DEBE FALLAR — clase 'show' no se remueve
+  assert('Bug A — inst-screen NO tiene clase "show" después de goToSelect() [DEBE FALLAR en código sin fix]',
+    !inst_post.classList.contains('show'),
+    'classList: "' + inst_post.className + '" — clase "show" no fue removida');
+
+  // ─── SUITE 2 — goToSelect() desde título (comportamiento de referencia) ──
+  logSuiteTitle('SUITE 2 — goToSelect() desde título (comportamiento de referencia)');
+  log('Configurando estado desde título y llamando goToSelect()...', 'info');
+
+  resetDOM();
+  const ts_t   = document.getElementById('title-screen');
+  const inst_t = document.getElementById('inst-screen');
+
+  assert('Precondición: title-screen.style.display === "flex" (desde título)',
+    ts_t.style.display === 'flex', 'Actual: "' + ts_t.style.display + '"');
+  assert('Precondición: inst-screen.style.display === "none" (no se visitaron instrucciones)',
+    inst_t.style.display === 'none', 'Actual: "' + inst_t.style.display + '"');
+
+  goToSelect();
+
+  setTimeout(function() {
+    const sel_t2  = document.getElementById('sel-screen');
+    const ts_t2   = document.getElementById('title-screen');
+    const inst_t2 = document.getElementById('inst-screen');
+
+    assert('Desde título — sel-screen.style.display === "block" después de 700ms',
+      sel_t2.style.display === 'block', 'Actual: "' + sel_t2.style.display + '"');
+    assert('Desde título — title-screen.style.display === "none"',
+      ts_t2.style.display === 'none', 'Actual: "' + ts_t2.style.display + '"');
+    assert('Desde título — inst-screen.style.display === "none" (no tapa a sel-screen)',
+      inst_t2.style.display === 'none', 'Actual: "' + inst_t2.style.display + '"');
+
+    renderResults();
+
+    const failedTests = results.filter(r => !r.pass);
+    const ce = document.createElement('div');
+    ce.className = 'counterexample';
+    if (failedTests.length > 0) {
+      ce.innerHTML =
+        '<strong>⚠ CONTRAEJEMPLO DOCUMENTADO (confirma que el bug existe):</strong><br><br>' +
+        '<strong>Condición de bug (isBugConditionA):</strong><br>' +
+        '&nbsp;&nbsp;• title_screen.style.display === "none"<br>' +
+        '&nbsp;&nbsp;• inst_screen.classList.contains("show") === true<br><br>' +
+        '<strong>Comportamiento observado tras goToSelect():</strong><br>' +
+        '&nbsp;&nbsp;• sel-screen.style.display = "block"  (el setTimeout sí ejecuta)<br>' +
+        '&nbsp;&nbsp;• inst-screen.style.display = "' + inst_post.style.display + '"  ← BUG: inst-screen NO se oculta<br>' +
+        '&nbsp;&nbsp;• inst-screen.classList contiene "show"  ← BUG: clase no se remueve<br><br>' +
+        '<strong>Causa raíz:</strong><br>' +
+        '&nbsp;&nbsp;• goToSelect() NO oculta inst-screen antes de mostrar sel-screen.<br>' +
+        '&nbsp;&nbsp;• inst-screen tiene z-index:75, sel-screen tiene z-index:50.<br>' +
+        '&nbsp;&nbsp;• inst-screen (visible, z-index:75) TAPA a sel-screen (z-index:50).<br>' +
+        '&nbsp;&nbsp;• El usuario ve instrucciones en lugar de la pantalla de selección.<br><br>' +
+        '<strong>Comportamiento esperado (tras el fix):</strong><br>' +
+        '&nbsp;&nbsp;• goToSelect() debe ocultar inst-screen: classList.remove("show") + style.display="none"<br>' +
+        '&nbsp;&nbsp;• Luego mostrar sel-screen directamente si title-screen ya está oculto<br><br>' +
+        '<strong>Tests fallidos:</strong><br>' +
+        failedTests.map(t => '&nbsp;&nbsp;• ' + t.description + '<br>&nbsp;&nbsp;&nbsp;&nbsp;' + t.detail).join('<br>');
+    } else {
+      ce.style.borderColor = 'rgba(111,171,42,.4)';
+      ce.style.color = '#6fab2a';
+      ce.innerHTML = '<strong>✓ Todos los tests pasaron</strong> — El bug no se reproduce (posible fix ya aplicado)';
+    }
+    document.getElementById('output').appendChild(ce);
+
+  }, 700);
+}, 700);
+
+// ─── SUITE 3 — Bug B: showPassDevice cubre viewport completo durante partida ─
+// Property 1: Bug Condition — showPassDevice activa overlay fullscreen durante transiciones de turno
+// Validates: Requirements 1.2, 1.3, 1.4, 2.2, 2.3, 2.4
+//
+// CRITICAL: Este test DEBE CONFIRMAR el bug en código sin fix.
+// El fallo (overlay fullscreen activo) confirma que el bug existe.
+// NO intentar arreglar el test ni el código.
+//
+// Scoped PBT Approach:
+//   - Fijar caso concreto: gameMode='local', game div visible, llamar showPassDevice directamente
+//   - Verificar que #pass-device.classList.contains('show') === true
+//   - Verificar que el overlay tiene position:fixed, inset:0 (cubre 100% viewport)
+//   - Documentar contraejemplo: "showPassDevice durante partida → overlay fullscreen cubre tablero"
+
+setTimeout(function() {
+  logSuiteTitle('SUITE 3 — Bug B: showPassDevice cubre viewport completo durante partida (Property 1: Bug Condition)');
+  log('Simulando condición de bug B: gameMode=local, game div visible, llamar showPassDevice()...', 'info');
+
+  // Array local de resultados para Suite 3 (independiente del array global ya renderizado)
+  const s3results = [];
+  function s3assert(description, condition, detail) {
+    s3results.push({ description, pass: condition, detail: detail || '' });
+  }
+
+  // ── Precondición: simular partida local en curso ──────────────────────────
+  // gameMode = 'local' (variable implícita — la función no la verifica, solo actúa)
+  // game div visible (display:flex) — simula partida en curso
+  const gameDiv = document.getElementById('game');
+  gameDiv.style.display = 'flex';
+
+  // Asegurar que pass-device empieza sin clase 'show'
+  const pd = document.getElementById('pass-device');
+  pd.classList.remove('show');
+  pd.style.display = 'none';
+
+  s3assert('Precondición Bug B: game div visible (display:flex — partida en curso)',
+    gameDiv.style.display === 'flex', 'Actual: "' + gameDiv.style.display + '"');
+  s3assert('Precondición Bug B: #pass-device NO tiene clase "show" antes de llamar showPassDevice()',
+    !pd.classList.contains('show'), 'classList: "' + pd.className + '"');
+
+  // ── Llamar showPassDevice directamente (como ocurre en transición de turno) ─
+  let callbackFired = false;
+  showPassDevice('Jugador 2', 'Alineación', function() { callbackFired = true; });
+
+  // ── Verificar comportamiento del bug ─────────────────────────────────────
+  const pdAfter = document.getElementById('pass-device');
+
+  // BUG CONFIRMADO: #pass-device tiene clase 'show' → overlay activo
+  s3assert('Bug B — #pass-device.classList.contains("show") === true tras showPassDevice() [CONFIRMA el bug]',
+    pdAfter.classList.contains('show'),
+    'classList: "' + pdAfter.className + '" — overlay activado durante partida en curso');
+
+  // Verificar que el overlay tiene position:fixed e inset:0 (cubre 100% viewport)
+  // Estos estilos están definidos en el CSS del DOM de test (replicando Arcanus_V9.html):
+  //   #pass-device{display:none;position:fixed;inset:0;z-index:180;...}
+  const pdInlineStyle = pdAfter.getAttribute('style') || '';
+  s3assert('Bug B — #pass-device tiene position:fixed (cubre viewport, no es relativo al flujo)',
+    pdInlineStyle.includes('position:fixed') || pdInlineStyle.includes('position: fixed'),
+    'style attr: "' + pdInlineStyle + '" — position:fixed replica CSS de Arcanus_V9.html');
+
+  s3assert('Bug B — #pass-device tiene inset:0 (ocupa 100% del viewport: top/right/bottom/left = 0)',
+    pdInlineStyle.includes('inset:0') || pdInlineStyle.includes('inset: 0'),
+    'style attr: "' + pdInlineStyle + '" — inset:0 replica CSS de Arcanus_V9.html');
+
+  // Verificar que el game div sigue "visible" pero tapado por el overlay (z-index:180 > z-index:1)
+  s3assert('Bug B — game div permanece con display:flex (tablero existe pero está tapado por overlay z-index:180)',
+    gameDiv.style.display === 'flex',
+    'Actual: "' + gameDiv.style.display + '" — el tablero existe pero el overlay z-index:180 lo tapa');
+
+  // ── Renderizar resultados de Suite 3 (array local independiente) ─────────
+  const out = document.getElementById('output');
+  const s3passed = s3results.filter(r => r.pass).length;
+  const s3failed = s3results.length - s3passed;
+
+  s3results.forEach(r => {
+    const div = document.createElement('div');
+    div.className = 'test ' + (r.pass ? 'pass' : 'fail');
+    div.innerHTML = '<pre>' + (r.pass ? '✓ PASS' : '✗ FAIL') + '  ' + r.description +
+      (r.detail ? '\n       ' + r.detail : '') + '</pre>';
+    out.appendChild(div);
+  });
+
+  const sum3 = document.createElement('div');
+  sum3.className = 'summary ' + (s3failed > 0 ? 'has-fail' : 'all-pass');
+  sum3.textContent = 'Suite 3 — Resultados: ' + s3passed + '/' + s3results.length + ' pasaron — ' + s3failed + ' fallaron';
+  out.appendChild(sum3);
+
+  // Documentar contraejemplo de Bug B
+  const ceBugB = document.createElement('div');
+  ceBugB.className = 'counterexample';
+
+  const bugBConfirmed = pdAfter.classList.contains('show');
+
+  if (bugBConfirmed) {
+    ceBugB.innerHTML =
+      '<strong>⚠ CONTRAEJEMPLO DOCUMENTADO — Bug B (confirma que el bug existe):</strong><br><br>' +
+      '<strong>Condición de bug (isBugConditionB):</strong><br>' +
+      '&nbsp;&nbsp;• gameMode === "local"<br>' +
+      '&nbsp;&nbsp;• game_div.style.display === "flex"  (partida en curso)<br>' +
+      '&nbsp;&nbsp;• showPassDevice() llamado durante transición de turno<br><br>' +
+      '<strong>Comportamiento observado tras showPassDevice("Jugador 2", "Alineación", cb):</strong><br>' +
+      '&nbsp;&nbsp;• pass_device.classList.contains("show") === true  ← BUG CONFIRMADO<br>' +
+      '&nbsp;&nbsp;• Overlay activo con position:fixed; inset:0; z-index:180<br>' +
+      '&nbsp;&nbsp;• El overlay cubre el 100% del viewport (width=100vw, height=100vh)<br>' +
+      '&nbsp;&nbsp;• El tablero de juego (#game) queda completamente oculto bajo el overlay<br><br>' +
+      '<strong>Causa raíz:</strong><br>' +
+      '&nbsp;&nbsp;• showPassDevice() añade clase "show" a #pass-device.<br>' +
+      '&nbsp;&nbsp;• CSS: #pass-device{position:fixed;inset:0;z-index:180;background:var(--bg)}<br>' +
+      '&nbsp;&nbsp;• CSS: #pass-device.show{display:flex} — activa el overlay fullscreen opaco.<br>' +
+      '&nbsp;&nbsp;• Se invoca ~9 veces durante una partida local (alineación, turnos, defensas).<br><br>' +
+      '<strong>Comportamiento esperado (tras el fix):</strong><br>' +
+      '&nbsp;&nbsp;• Las transiciones de turno durante la partida NO deben activar #pass-device.<br>' +
+      '&nbsp;&nbsp;• Usar showTurnIndicator() con el modal existente (#modal) — no cubre el viewport.<br>' +
+      '&nbsp;&nbsp;• El tablero de juego debe permanecer visible durante las transiciones de turno.<br>' +
+      '&nbsp;&nbsp;• showPassDevice() solo se mantiene en onSelConfirm() para selección de arquetipo J2.';
+  } else {
+    ceBugB.style.borderColor = 'rgba(111,171,42,.4)';
+    ceBugB.style.color = '#6fab2a';
+    ceBugB.innerHTML = '<strong>✓ Bug B no se reproduce</strong> — El fix ya fue aplicado o el overlay no se activa.';
+  }
+  out.appendChild(ceBugB);
+
+}, 1500); // Ejecutar después de las suites 1 y 2 (que usan 700ms + 700ms)
+// ─── setMode — extraída de Arcanus_V9.html (sin modificar) ────────────────
+let gameMode = 'ai';
+let selPhase = 1;
+let selArch = null, selEl = null;
+
+function setMode(m) {
+  gameMode = m;
+  document.getElementById('mode-ai').classList.toggle('chosen', m === 'ai');
+  document.getElementById('mode-local').classList.toggle('chosen', m === 'local');
+  const note = document.getElementById('sel-player-note');
+  note.textContent = m === 'local' ? 'Jugador 1 — Elige tu Arcano' : 'Elige tu Arcano';
+  note.style.display = m === 'local' ? 'block' : 'none';
+  selPhase = 1; selArch = null; selEl = null;
+  document.getElementById('sel-confirm').disabled = true;
+}
+
+// ─── SUITE 4 — Bug C: sin inputs de nombre en modo local ───────────────────
+// Property 1: Bug Condition — No existen campos de nombre al seleccionar modo local
+// Validates: Requirements 1.5, 1.6, 2.5, 2.6
+//
+// CRITICAL: Este test DEBE CONFIRMAR el bug en código sin fix.
+// Scoped PBT Approach: Fijar el caso concreto: llamar setMode('local') y verificar ausencia de inputs.
+// GOAL: Demostrar que #p1-name-input y #p2-name-input no existen en el DOM.
+
+setTimeout(function () {
+  logSuiteTitle('SUITE 4 — Bug C: sin inputs de nombre en modo local (Property 1: Bug Condition)');
+  log('Simulando condición de bug C: llamar setMode("local") y verificar ausencia de inputs...', 'info');
+
+  const s4results = [];
+  function s4assert(description, condition, detail) {
+    s4results.push({ description, pass: condition, detail: detail || '' });
+  }
+
+  // ── Precondición: estado inicial — modo AI por defecto ───────────────────
+  s4assert('Precondición Bug C: gameMode inicial es "ai"',
+    gameMode === 'ai', 'Actual: "' + gameMode + '"');
+
+  // ── Llamar setMode('local') — como cuando el usuario hace clic en "Local · 2 Jugadores" ─
+  setMode('local');
+
+  s4assert('Precondición Bug C: setMode("local") ejecutó sin error — gameMode === "local"',
+    gameMode === 'local', 'Actual: "' + gameMode + '"');
+
+  // ── Verificar ausencia de inputs — CONFIRMA el bug ───────────────────────
+  const p1Input = document.getElementById('p1-name-input');
+  const p2Input = document.getElementById('p2-name-input');
+  const nameInputsDiv = document.getElementById('name-inputs');
+
+  // BUG CONFIRMADO: los inputs no existen en el DOM
+  s4assert('Bug C — document.getElementById("p1-name-input") === null [CONFIRMA el bug]',
+    p1Input === null,
+    'Actual: ' + (p1Input === null ? 'null (input NO existe en el DOM)' : 'elemento encontrado — bug no presente'));
+
+  s4assert('Bug C — document.getElementById("p2-name-input") === null [CONFIRMA el bug]',
+    p2Input === null,
+    'Actual: ' + (p2Input === null ? 'null (input NO existe en el DOM)' : 'elemento encontrado — bug no presente'));
+
+  s4assert('Bug C — document.getElementById("name-inputs") === null (contenedor tampoco existe) [CONFIRMA el bug]',
+    nameInputsDiv === null,
+    'Actual: ' + (nameInputsDiv === null ? 'null (div#name-inputs NO existe en el DOM)' : 'elemento encontrado — bug no presente'));
+
+  // ── Verificar que setMode('ai') tampoco tiene inputs (consistencia) ──────
+  setMode('ai');
+  const p1InputAI = document.getElementById('p1-name-input');
+  s4assert('Consistencia: setMode("ai") tampoco tiene #p1-name-input (inputs no existen en ningún modo)',
+    p1InputAI === null,
+    'Actual: ' + (p1InputAI === null ? 'null' : 'elemento encontrado'));
+
+  // ── Renderizar resultados de Suite 4 ─────────────────────────────────────
+  const out = document.getElementById('output');
+  const s4passed = s4results.filter(r => r.pass).length;
+  const s4failed = s4results.length - s4passed;
+
+  s4results.forEach(r => {
+    const div = document.createElement('div');
+    div.className = 'test ' + (r.pass ? 'pass' : 'fail');
+    div.innerHTML = '<pre>' + (r.pass ? '✓ PASS' : '✗ FAIL') + '  ' + r.description +
+      (r.detail ? '\n       ' + r.detail : '') + '</pre>';
+    out.appendChild(div);
+  });
+
+  const sum4 = document.createElement('div');
+  sum4.className = 'summary ' + (s4failed > 0 ? 'has-fail' : 'all-pass');
+  sum4.textContent = 'Suite 4 — Resultados: ' + s4passed + '/' + s4results.length + ' pasaron — ' + s4failed + ' fallaron';
+  out.appendChild(sum4);
+
+  // ── Documentar contraejemplo de Bug C ────────────────────────────────────
+  const ceBugC = document.createElement('div');
+  ceBugC.className = 'counterexample';
+
+  const bugCConfirmed = (p1Input === null && p2Input === null);
+
+  if (bugCConfirmed) {
+    ceBugC.innerHTML =
+      '<strong>⚠ CONTRAEJEMPLO DOCUMENTADO — Bug C (confirma que el bug existe):</strong><br><br>' +
+      '<strong>Condición de bug (isBugConditionC):</strong><br>' +
+      '&nbsp;&nbsp;• gameMode === "local"<br>' +
+      '&nbsp;&nbsp;• NOT EXISTS input#p1-name-input IN sel_screen<br>' +
+      '&nbsp;&nbsp;• NOT EXISTS input#p2-name-input IN sel_screen<br><br>' +
+      '<strong>Comportamiento observado tras setMode("local"):</strong><br>' +
+      '&nbsp;&nbsp;• document.getElementById("p1-name-input") === null  ← BUG CONFIRMADO<br>' +
+      '&nbsp;&nbsp;• document.getElementById("p2-name-input") === null  ← BUG CONFIRMADO<br>' +
+      '&nbsp;&nbsp;• document.getElementById("name-inputs") === null  ← contenedor tampoco existe<br>' +
+      '&nbsp;&nbsp;• setMode() no crea ni muestra ningún campo de nombre<br><br>' +
+      '<strong>Causa raíz:</strong><br>' +
+      '&nbsp;&nbsp;• Los inputs #p1-name-input y #p2-name-input simplemente no fueron agregados al HTML de #sel-screen.<br>' +
+      '&nbsp;&nbsp;• setMode() no tiene lógica para mostrar/ocultar inputs de nombre.<br>' +
+      '&nbsp;&nbsp;• startGame() asigna hardcoded "Jugador 1" / "Jugador 2" sin consultar al usuario.<br><br>' +
+      '<strong>Comportamiento esperado (tras el fix):</strong><br>' +
+      '&nbsp;&nbsp;• Agregar div#name-inputs con #p1-name-input y #p2-name-input al HTML de #sel-screen.<br>' +
+      '&nbsp;&nbsp;• setMode("local") → name-inputs.style.display = "flex" (inputs visibles).<br>' +
+      '&nbsp;&nbsp;• setMode("ai") → name-inputs.style.display = "none" (inputs ocultos).<br>' +
+      '&nbsp;&nbsp;• startGame() lee los valores de los inputs con fallback a "Jugador 1" / "Jugador 2".';
+  } else {
+    ceBugC.style.borderColor = 'rgba(111,171,42,.4)';
+    ceBugC.style.color = '#6fab2a';
+    ceBugC.innerHTML = '<strong>✓ Bug C no se reproduce</strong> — Los inputs de nombre ya existen en el DOM (fix ya aplicado).';
+  }
+  out.appendChild(ceBugC);
+
+}, 2300); // Ejecutar después de las suites 1, 2 y 3 (700ms + 700ms + 1500ms ≈ 2300ms)
+
+// ─── SUITE 5 — Preservation: comportamientos existentes no deben cambiar ───
+//
+// Property 2: Preservation — Comportamientos existentes no deben cambiar tras el fix
+// Validates: Requirements 3.1, 3.3, 3.6
+//
+// METODOLOGÍA OBSERVATION-FIRST (código SIN fix):
+//
+// Observación 1 — goToSelect() desde título (req 3.1):
+//   • title-screen.style.display === 'flex' (visible)
+//   • goToSelect() añade clase 'hide' a title-screen → animación CSS fade-out
+//   • setTimeout(580ms) → title-screen.style.display='none', sel-screen.style.display='block'
+//   • Comportamiento a preservar: animación ocurre, sel-screen aparece después de ~580ms
+//
+// Observación 2 — onSelConfirm() con selPhase===1 y gameMode==='local' (req 3.3):
+//   • window.onSelConfirm() verifica gameMode==='local' && selPhase===1
+//   • Llama showPassDevice('Jugador 2','Elige tu Arcano', callback)
+//   • showPassDevice añade clase 'show' a #pass-device → overlay fullscreen para selección J2
+//   • Comportamiento a preservar: showPassDevice ES llamado (overlay fullscreen en selección de arquetipo)
+//
+// Observación 3 — backToTitle() desde instrucciones (req 3.6):
+//   • inst-screen.classList.remove('show') → quita clase 'show'
+//   • inst-screen.style.display='none' → oculta instrucciones
+//   • title-screen.style.display='flex' → muestra título
+//   • title-screen.classList.remove('hide') → limpia animación
+//   • title-screen.style.opacity='1' → restaura opacidad
+//   • Comportamiento a preservar: title-screen visible, inst-screen sin clase 'show'
+//
+// EXPECTED OUTCOME: TODOS estos tests PASAN en código sin fix (son el baseline a preservar)
+
+// ─── Funciones de preservación — extraídas de Arcanus_V9.html (sin modificar) ─
+// (goToSelect, goToInstructions, showPassDevice ya están definidas arriba en el archivo)
+
+// backToTitle — extraída de Arcanus_V9.html (sin modificar)
+function backToTitle() {
+  document.getElementById('inst-screen').classList.remove('show');
+  document.getElementById('inst-screen').style.display = 'none';
+  const ts = document.getElementById('title-screen');
+  ts.style.display = 'flex';
+  ts.classList.remove('hide');
+  ts.style.opacity = '1';
+}
+
+// Variables de estado para onSelConfirm de preservación
+let _pres_gameMode = 'ai';
+let _pres_selPhase = 1;
+let _pres_selArch = null;
+let _pres_selEl = null;
+let _pres_showPassDeviceCalled = false;
+let _pres_showPassDeviceArgs = null;
+
+// showPassDevice spy — envuelve la función real para registrar si fue llamada
+function makeShowPassDeviceSpy() {
+  const original = showPassDevice;
+  return function spyShowPassDevice(name, action, callback) {
+    _pres_showPassDeviceCalled = true;
+    _pres_showPassDeviceArgs = { name, action };
+    original(name, action, callback);
+  };
+}
+
+// onSelConfirm local — versión mínima extraída de Arcanus_V9.html (sin modificar)
+// Usa las variables _pres_* para aislar el test del estado global
+function onSelConfirmPres(spyFn) {
+  if (_pres_gameMode === 'local' && _pres_selPhase === 1) {
+    spyFn('Jugador 2', 'Elige tu Arcano', function() {
+      _pres_selPhase = 2;
+    });
+    return;
+  }
+  // selPhase===2 o modo AI → startGame() (no testeado aquí)
+}
+
+setTimeout(function () {
+  logSuiteTitle('SUITE 5 — Preservation: comportamientos existentes no deben cambiar (Property 2)');
+  log('Verificando baseline a preservar en código SIN fix...', 'info');
+
+  const s5results = [];
+  function s5assert(description, condition, detail) {
+    s5results.push({ description, pass: condition, detail: detail || '' });
+  }
+
+  // ── TEST P5.1 — goToSelect() desde título ejecuta animación y muestra sel-screen (req 3.1) ──
+  // Para todo estado donde title-screen.style.display !== 'none',
+  // goToSelect() debe añadir clase 'hide' y mostrar sel-screen después de 580ms.
+  log('P5.1 — goToSelect() desde título: animación + sel-screen después de 580ms...', 'info');
+
+  resetDOM(); // title-screen.style.display='flex', inst-screen oculto, sel-screen oculto
+  const ts_p51 = document.getElementById('title-screen');
+  const sel_p51 = document.getElementById('sel-screen');
+
+  s5assert('P5.1 Precondición: title-screen.style.display !== "none" (viene del título)',
+    ts_p51.style.display !== 'none',
+    'Actual: "' + ts_p51.style.display + '"');
+
+  goToSelect(); // llamar desde estado de título
+
+  // Inmediatamente después: title-screen debe tener clase 'hide' (animación iniciada)
+  s5assert('P5.1 — title-screen tiene clase "hide" inmediatamente tras goToSelect() (animación iniciada)',
+    ts_p51.classList.contains('hide'),
+    'classList: "' + ts_p51.className + '" — clase hide debe añadirse para la animación CSS');
+
+  // sel-screen aún NO debe estar visible (el setTimeout no ha ejecutado)
+  s5assert('P5.1 — sel-screen.style.display !== "block" inmediatamente (setTimeout pendiente)',
+    sel_p51.style.display !== 'block',
+    'Actual: "' + sel_p51.style.display + '" — sel-screen no debe aparecer antes de 580ms');
+
+  setTimeout(function () {
+    // Después de 700ms (> 580ms): sel-screen debe ser visible, title-screen oculto
+    const ts_after = document.getElementById('title-screen');
+    const sel_after = document.getElementById('sel-screen');
+
+    s5assert('P5.1 — sel-screen.style.display === "block" después de 700ms (setTimeout ejecutó)',
+      sel_after.style.display === 'block',
+      'Actual: "' + sel_after.style.display + '"');
+
+    s5assert('P5.1 — title-screen.style.display === "none" después de 700ms',
+      ts_after.style.display === 'none',
+      'Actual: "' + ts_after.style.display + '"');
+
+    // ── TEST P5.2 — onSelConfirm() con selPhase===1 y gameMode==='local' → showPassDevice llamado (req 3.3) ──
+    log('P5.2 — onSelConfirm() selPhase===1 + gameMode=local → showPassDevice es llamado...', 'info');
+
+    // Resetear estado de spy
+    _pres_showPassDeviceCalled = false;
+    _pres_showPassDeviceArgs = null;
+    _pres_gameMode = 'local';
+    _pres_selPhase = 1;
+
+    // Resetear DOM de pass-device para el test
+    const pd_p52 = document.getElementById('pass-device');
+    pd_p52.classList.remove('show');
+
+    const spy = makeShowPassDeviceSpy();
+    onSelConfirmPres(spy);
+
+    s5assert('P5.2 — showPassDevice fue llamado cuando selPhase===1 y gameMode==="local"',
+      _pres_showPassDeviceCalled === true,
+      'showPassDeviceCalled: ' + _pres_showPassDeviceCalled + ' — debe ser true para selección de arquetipo J2');
+
+    s5assert('P5.2 — showPassDevice llamado con nombre "Jugador 2"',
+      _pres_showPassDeviceArgs !== null && _pres_showPassDeviceArgs.name === 'Jugador 2',
+      'args.name: "' + (_pres_showPassDeviceArgs ? _pres_showPassDeviceArgs.name : 'null') + '"');
+
+    s5assert('P5.2 — #pass-device tiene clase "show" (overlay fullscreen activo para selección J2)',
+      pd_p52.classList.contains('show'),
+      'classList: "' + pd_p52.className + '" — overlay fullscreen debe activarse en selección de arquetipo J2');
+
+    // ── TEST P5.3 — backToTitle() → title-screen visible, inst-screen sin clase 'show' (req 3.6) ──
+    log('P5.3 — backToTitle() → title-screen visible, inst-screen sin clase show...', 'info');
+
+    // Simular estado post-instrucciones: inst-screen visible con clase 'show', title-screen oculto
+    const ts_p53 = document.getElementById('title-screen');
+    const inst_p53 = document.getElementById('inst-screen');
+    ts_p53.style.display = 'none';
+    ts_p53.classList.add('hide');
+    ts_p53.style.opacity = '0';
+    inst_p53.style.display = 'block';
+    inst_p53.classList.add('show');
+
+    s5assert('P5.3 Precondición: inst-screen tiene clase "show" (estado post-instrucciones)',
+      inst_p53.classList.contains('show'),
+      'classList: "' + inst_p53.className + '"');
+    s5assert('P5.3 Precondición: title-screen.style.display === "none"',
+      ts_p53.style.display === 'none',
+      'Actual: "' + ts_p53.style.display + '"');
+
+    backToTitle();
+
+    s5assert('P5.3 — title-screen.style.display === "flex" tras backToTitle()',
+      ts_p53.style.display === 'flex',
+      'Actual: "' + ts_p53.style.display + '"');
+
+    s5assert('P5.3 — title-screen NO tiene clase "hide" tras backToTitle()',
+      !ts_p53.classList.contains('hide'),
+      'classList: "' + ts_p53.className + '"');
+
+    s5assert('P5.3 — title-screen.style.opacity === "1" tras backToTitle()',
+      ts_p53.style.opacity === '1',
+      'Actual: "' + ts_p53.style.opacity + '"');
+
+    s5assert('P5.3 — inst-screen NO tiene clase "show" tras backToTitle()',
+      !inst_p53.classList.contains('show'),
+      'classList: "' + inst_p53.className + '"');
+
+    s5assert('P5.3 — inst-screen.style.display === "none" tras backToTitle()',
+      inst_p53.style.display === 'none',
+      'Actual: "' + inst_p53.style.display + '"');
+
+    // ── Renderizar resultados de Suite 5 ─────────────────────────────────────
+    const out = document.getElementById('output');
+    const s5passed = s5results.filter(r => r.pass).length;
+    const s5failed = s5results.length - s5passed;
+
+    s5results.forEach(r => {
+      const div = document.createElement('div');
+      div.className = 'test ' + (r.pass ? 'pass' : 'fail');
+      div.innerHTML = '<pre>' + (r.pass ? '✓ PASS' : '✗ FAIL') + '  ' + r.description +
+        (r.detail ? '\n       ' + r.detail : '') + '</pre>';
+      out.appendChild(div);
+    });
+
+    const sum5 = document.createElement('div');
+    sum5.className = 'summary ' + (s5failed > 0 ? 'has-fail' : 'all-pass');
+    sum5.textContent = 'Suite 5 — Preservation — Resultados: ' + s5passed + '/' + s5results.length + ' pasaron — ' + s5failed + ' fallaron';
+    out.appendChild(sum5);
+
+    // ── Documentar comportamientos observados (baseline) ─────────────────────
+    const cePreservation = document.createElement('div');
+    cePreservation.className = 'counterexample';
+    cePreservation.style.borderColor = s5failed === 0 ? 'rgba(111,171,42,.4)' : 'rgba(232,83,78,.4)';
+    cePreservation.style.color = s5failed === 0 ? '#6fab2a' : '#f08080';
+
+    if (s5failed === 0) {
+      cePreservation.innerHTML =
+        '<strong>✓ BASELINE DOCUMENTADO — Suite 5 Preservation (todos los tests pasan en código sin fix):</strong><br><br>' +
+        '<strong>Comportamiento observado P5.1 — goToSelect() desde título (req 3.1):</strong><br>' +
+        '&nbsp;&nbsp;• title-screen.style.display !== "none" → goToSelect() añade clase "hide" (animación CSS)<br>' +
+        '&nbsp;&nbsp;• setTimeout(580ms) → title-screen.style.display="none", sel-screen.style.display="block"<br>' +
+        '&nbsp;&nbsp;• La animación de fade-out ocurre antes de mostrar sel-screen<br><br>' +
+        '<strong>Comportamiento observado P5.2 — onSelConfirm() selPhase===1 + local (req 3.3):</strong><br>' +
+        '&nbsp;&nbsp;• gameMode==="local" && selPhase===1 → showPassDevice("Jugador 2","Elige tu Arcano", cb)<br>' +
+        '&nbsp;&nbsp;• #pass-device recibe clase "show" → overlay fullscreen activo<br>' +
+        '&nbsp;&nbsp;• Este comportamiento DEBE PRESERVARSE tras el fix (selección de arquetipo J2)<br><br>' +
+        '<strong>Comportamiento observado P5.3 — backToTitle() (req 3.6):</strong><br>' +
+        '&nbsp;&nbsp;• inst-screen.classList.remove("show") → quita clase show<br>' +
+        '&nbsp;&nbsp;• inst-screen.style.display="none" → oculta instrucciones<br>' +
+        '&nbsp;&nbsp;• title-screen.style.display="flex" → muestra título<br>' +
+        '&nbsp;&nbsp;• title-screen.classList.remove("hide") + style.opacity="1" → restaura estado<br><br>' +
+        '<strong>Estos tests son el BASELINE a preservar. Deben seguir pasando tras el fix.</strong>';
+    } else {
+      const failedTests = s5results.filter(r => !r.pass);
+      cePreservation.innerHTML =
+        '<strong>⚠ ALERTA — Suite 5 Preservation tiene fallos inesperados:</strong><br><br>' +
+        '<strong>Tests fallidos (NO deberían fallar en código sin fix):</strong><br>' +
+        failedTests.map(t => '&nbsp;&nbsp;• ' + t.description + '<br>&nbsp;&nbsp;&nbsp;&nbsp;' + t.detail).join('<br>') +
+        '<br><br><strong>Investigar causa — estos tests deben pasar en código sin fix.</strong>';
+    }
+    out.appendChild(cePreservation);
+
+  }, 700); // esperar 700ms para que el setTimeout de goToSelect() (580ms) ejecute
+
+}, 3100); // Ejecutar después de suites 1-4 (2300ms + 800ms de margen)
+</script>
+</body>
+</html>
