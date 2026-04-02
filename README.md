@@ -1,11 +1,5 @@
 # 🜏 ARCANUS 🜏
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Estado-En%20Desarrollo-6a0dad?style=for-the-badge">
-  <img src="https://img.shields.io/badge/Jugadores-2--6-1f6feb?style=for-the-badge">
-  <img src="https://img.shields.io/badge/Tipo-Táctico%20Arcano-ff4d4d?style=for-the-badge">
-</p>
-
 ---
 
 ## ✨ 🔮 ¿Qué es Arcanus?
