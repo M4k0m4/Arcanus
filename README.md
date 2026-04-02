@@ -82,7 +82,7 @@ Arcanus no busca ser solo un juego:
 
 ## 📜 Licencia
 
-🔒 Por definir…  
+🔒 developed by Daniel Matus  
 (o sellada con sangre, dependiendo del desenlace)
 
 ---
